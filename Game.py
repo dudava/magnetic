@@ -1,75 +1,95 @@
 import pygame as pg
-import random
+from loguru import logger
 
 from GameClient import *
 from settings import HOST
 
-pg.init()
-SIZE = WIDTH, HEIGHT = 1280, 720
-display = pg.display.set_mode(SIZE)    
-running = True
-fps = 60
+logger.add("file.log", backtrace=True, diagnose=True, enqueue=True, )
+
+
+WIDTH, HEIGHT = SIZE = 640, 480
+FPS = 100
+display = pg.display.set_mode(SIZE)
 clock = pg.time.Clock()
+running = True
 
-allSprites = pg.sprite.Group()
+allPersons = pg.sprite.Group()
 
-class Hero(pg.sprite.Sprite, ISynchronizedObject):
-    def __init__(self, rect, color):
+
+class Person(pg.sprite.Sprite, ISynchronizedObject):
+    def __init__(self, coords, color):
         ISynchronizedObject.__init__(self)
-        super().__init__(allSprites)
-        self.velocity = 100
-        self.rect = pg.rect.Rect(*rect)
-        self.image = pg.Surface((self.rect.w, self.rect.h))
+        super().__init__(allPersons)
         self.color = color
-        pg.draw.rect(self.image, self.color, (0, 0, self.rect.w, self.rect.h))
+
+        self.wh = (30, 50)
+        self.velocity = 100
+        self.rect = pg.rect.Rect(*coords, *self.wh)
+        self.image = pg.Surface(self.wh)
+        pg.draw.rect(self.image, self.color, (0, 0, *self.wh))
 
     @staticmethod
     def getInitSyncObjectData(packageDict):
-        packageDict["rect"] = tuple(packageDict["rect"])
-        return packageDict
+        logger.debug(packageDict)
+        init_dict = {"coords": packageDict["coords"],
+                     "color": (0, 0, 0)}
+        logger.debug(init_dict)
+        return init_dict
 
     def returnPackingData(self):
-        return {"rect": [self.rect.x, self.rect.y, self.rect.w, self.rect.h], 
-                "color": self.color}
+        logger.debug(f"Hero get pos: {self.rect}")
+        return {"coords": (self.rect.x, self.rect.y)}
 
-    def setPackingData(self, dictionary):
-        self.rect = pg.Rect(dictionary["rect"])
-        self.color = dictionary["color"]
-        pg.draw.rect(self.image, self.color, (0, 0, self.rect.w, self.rect.h))
-
-    def update(self, delta, direction):
-        self.rect = self.rect.move(round(direction * self.velocity * delta), 0)
+    def setPackingData(self, data):
+        logger.debug(f"Hero set pos: {self.rect}")
+        self.rect.x, self.rect.y = data["coords"]
 
     def remove(self):
         for _ in self.groups():
             _.remove(self)
-        print(self.groups())
+
+    def update(self, delta, direction):
+        self.rect = self.rect.move(round(direction[0]*self.velocity), round(direction[1]*self.velocity))
+        logger.debug(self.rect)
 
 
-if __name__ == "__main__":
-    client = GameTCPClient(HOST, globals(), True)
-    client.start()
-    client.isInitDone.wait()
-    print(client.id)
-    hero = client.synchronize(Hero, None, rect=(0, random.randint(100, 300), 20, 20), color=(random.randint(0, 255), 0, 0))
-    direction = 0
-    while running:
-        for event in pg.event.get():
-            if event.type == pg.QUIT:
-                running = False
+client = GameTCPClient(HOST, globals(), globalsEnabled=True)
+client.start()
+client.isInitDone.wait()
+
+hero = client.synchronize(Person, None, coords=(100, 200), color=(0, 0, 0))
+
+while running:
+    direction = (0, 0)
+    delta = clock.tick(FPS) / 1000
+    logger.debug(f"Hero pos before sync: {hero.rect}")
+    package = client.getPackage()
+    if package:     
+        client.processPackage(package)
         
-        delta = clock.tick(fps) / 1000
-        pack = client.getPackage()
-        if pack:
-            client.processPackage(pack)
-            client.donePackage()
+    logger.debug(f"Hero pos after sync: {hero.rect}")
+    for event in pg.event.get():
+        logger.debug(f"Proccess event: {event}")
+        if event.type == pg.QUIT:
+            running = False
+        if event.type == pg.KEYDOWN:
+            direction = (pg.key.get_pressed()[pg.K_d] - pg.key.get_pressed()[pg.K_a],
+                 pg.key.get_pressed()[pg.K_s] - pg.key.get_pressed()[pg.K_w])
+        if event.type == pg.MOUSEBUTTONDOWN:
+            logger.info(event.pos)
+            hero.rect.x, hero.rect.y = event.pos 
+    logger.debug("Start render")
+    display.fill((255, 255, 255))
 
-        display.fill((255, 255, 255))
+    
+    if not(direction[0] == 0 and direction[1] == 0):
+        hero.update(delta, direction)
+    allPersons.draw(display)
+    logger.debug("Frame prerendered")
+    pg.display.flip()
+    logger.debug("Frame rendered")
+    client.donePackage()
 
-        allSprites.update(delta, 1)
-        allSprites.draw(display)
-
-        pg.display.flip()
-
-    pg.quit()
-    client.close()
+print("Quited")
+pg.quit()
+client.close()

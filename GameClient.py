@@ -3,9 +3,12 @@ import socket
 import time
 import json
 from typing import Dict, List
+from loguru import logger
 
 from settings import HOST
 from settings import PACKAGE_SIZE
+
+logger.add("file.log", backtrace=True, diagnose=True) 
 
 class ISynchronizedObject:
     instanceCounter = 0
@@ -82,8 +85,11 @@ class GameTCPClient(threading.Thread):
             if self.client_socket.fileno() == -1:
                 break
             if not self.getPackage() and self.data:
-                self.send(self.formJSON(self.data).encode())
+                data = self.formJSON(self.data)
+                logger.debug(f"Send: {data}")
+                self.send(data.encode())
                 package = self.recv(PACKAGE_SIZE)
+                logger.debug(f"Received: {package}")
                 self.packageReceived(package)
 
     def processPackage(self, pack):
