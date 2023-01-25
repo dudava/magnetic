@@ -80,6 +80,7 @@ class GameTCPClient(threading.Thread):
     def runPackageCycle(self):
         self.id = self.recv(1).decode()
         self.syncObjects[self.id] = {}
+        self.syncObjects["s"] = {}
         self.isInitDone.set()
         while True:
             if self.client_socket.fileno() == -1:
@@ -106,7 +107,10 @@ class GameTCPClient(threading.Thread):
                 continue
             for obj in pack[_].keys():
                 if obj in self.getSyncObjectsList():
-                    obj_id = obj.split("-")[2].split(":")[1]
+                    if "-" in obj:
+                        obj_id = obj.split("-")[2].split(":")[1]
+                    else:
+                        obj_id = "s"
                     self.syncObjects[obj_id][obj].setPackingData(pack[_][obj])
                 elif obj not in self.getSyncObjectsList():
                     objData = pack[_][obj]
@@ -144,9 +148,10 @@ class GameTCPClient(threading.Thread):
         syncObj = syncObjectClass(**kwargs)
         if not packageAttribute:
             syncObj.setPackageAttribute(self)
+            self.syncObjects[self.id][syncObj.packageAttribute] = syncObj
         else:
             syncObj.setPackageAttribute(self, packageAttribute)
-        self.syncObjects[self.id][syncObj.packageAttribute] = syncObj
+            self.syncObjects["s"][syncObj.packageAttribute] = syncObj
         self.data.append(syncObj)
         return syncObj
 

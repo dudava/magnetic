@@ -1,10 +1,26 @@
 import threading
 import time
+import json
+from loguru import logger
+
+logger.add("file.log", backtrace=True, diagnose=True) 
 
 DISCONNECT_TIMEOUT = 1
 
 from settings import PACKAGE_SIZE
 
+
+class BrickManager:
+    def __init__(self, startState):
+        self.state = startState
+
+    def getState(self):
+        return self.state
+
+    def updateState(self, state):
+        logger.debug(state)
+
+brickManager = BrickManager("Start State")
 
 class GameConnectionPull:
     def __init__(self):
@@ -14,17 +30,20 @@ class GameConnectionPull:
         return JSONstring.replace("None", "null")
 
     def prepareData(self):
-        data = []
+        data = {}
         for _ in self.ids:
             if self.ids[_] != False:
-                data.append(f'"{_}": {self.ids[_].data}')
-        JSONstring = "{" + ", ".join(data) + "}"
-        return self.refactJSONstring(JSONstring)
+                data[_] = self.ids[_].data
+        # data.append(f'"BrickManager": {brickManager.getState()}')
+        data["s"] = {"BrickManager": {"state": brickManager.getState()} }
+        # JSONstring = "{" + ", ".join(data) + "}"
+        # return self.refactJSONstring(JSONstring)
+        return json.dumps(data)
 
 
 connections = GameConnectionPull()
 
-
+    
 class GameConnection(threading.Thread):
     def __init__(self, client_socket, addressInfo):
         super().__init__(target=self)
@@ -35,7 +54,7 @@ class GameConnection(threading.Thread):
         self.data = None
 
     def run(self):
-        print(self.getAddressInfo())
+        logger.info(self.getAddressInfo())
         self.runPackageCycle()
 
     def getAddressInfo(self):
@@ -47,8 +66,12 @@ class GameConnection(threading.Thread):
             try:
                 package = self.client_socket.recv(PACKAGE_SIZE)
                 if package == b"":
-                    break
-                self.data = package.decode()
+                    break   
+                self.data = json.loads(package.decode())
+                logger.debug(self.data)
+                if "BrickManager" in self.data:
+                    brickManager.updateState(self.data["BrickManager"])
+                    self.data.pop("BrickManager")
                 self.client_socket.sendall(connections.prepareData().encode())
             except ConnectionResetError:
                 break

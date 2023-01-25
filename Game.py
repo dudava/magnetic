@@ -4,7 +4,7 @@ from loguru import logger
 from GameClient import *
 from settings import HOST
 
-logger.add("file.log", backtrace=True, diagnose=True, enqueue=True, )
+logger.add("file.log", backtrace=True, diagnose=True, enqueue=True)
 
 
 WIDTH, HEIGHT = SIZE = 640, 480
@@ -30,18 +30,18 @@ class Person(pg.sprite.Sprite, ISynchronizedObject):
 
     @staticmethod
     def getInitSyncObjectData(packageDict):
-        logger.debug(packageDict)
+        # logger.debug(packageDict)
         init_dict = {"coords": packageDict["coords"],
                      "color": (0, 0, 0)}
-        logger.debug(init_dict)
+        # logger.debug(init_dict)
         return init_dict
 
     def returnPackingData(self):
-        logger.debug(f"Hero get pos: {self.rect}")
+        # logger.debug(f"Hero get pos: {self.rect}")
         return {"coords": (self.rect.x, self.rect.y)}
 
     def setPackingData(self, data):
-        logger.debug(f"Hero set pos: {self.rect}")
+        # logger.debug(f"Hero set pos: {self.rect}")
         self.rect.x, self.rect.y = data["coords"]
 
     def remove(self):
@@ -50,14 +50,25 @@ class Person(pg.sprite.Sprite, ISynchronizedObject):
 
     def update(self, delta, direction):
         self.rect = self.rect.move(round(direction[0]*self.velocity), round(direction[1]*self.velocity))
-        logger.debug(self.rect)
 
+
+
+class BrickManager(ISynchronizedObject):
+    def __init__(self):
+        self.state = None
+
+    def returnPackingData(self):
+        logger.debug("Send something")
+
+    def setPackingData(self, state):
+        logger.debug(state)
 
 client = GameTCPClient(HOST, globals(), globalsEnabled=True)
 client.start()
 client.isInitDone.wait()
 
 hero = client.synchronize(Person, None, coords=(100, 200), color=(0, 0, 0))
+client.synchronize(BrickManager, "BrickManager")
 
 while running:
     direction = (0, 0)
