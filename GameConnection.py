@@ -1,6 +1,8 @@
 import threading
 import time
 import json
+import itertools
+
 from loguru import logger
 
 logger.add("file.log", backtrace=True, diagnose=True) 
@@ -17,27 +19,24 @@ class BrickManager:
     def getState(self):
         return self.state
 
-    def updateState(self, state):
-        logger.debug(state)
+    def updateState(self, arrivedState):
+        if arrivedState:
+            self.state.update(arrivedState)
 
-brickManager = BrickManager("Start State")
+
+brickManager = BrickManager({"0 0": "+", "1 1": "+", "3 2": "+", "3 4": "+", "2 3": "+"})
+
 
 class GameConnectionPull:
     def __init__(self):
         self.ids = {_: False for _ in range(10)}
-    
-    def refactJSONstring(self, JSONstring):
-        return JSONstring.replace("None", "null")
 
     def prepareData(self):
         data = {}
         for _ in self.ids:
             if self.ids[_] != False:
                 data[_] = self.ids[_].data
-        # data.append(f'"BrickManager": {brickManager.getState()}')
         data["s"] = {"BrickManager": {"state": brickManager.getState()} }
-        # JSONstring = "{" + ", ".join(data) + "}"
-        # return self.refactJSONstring(JSONstring)
         return json.dumps(data)
 
 
@@ -68,7 +67,6 @@ class GameConnection(threading.Thread):
                 if package == b"":
                     break   
                 self.data = json.loads(package.decode())
-                logger.debug(self.data)
                 if "BrickManager" in self.data:
                     brickManager.updateState(self.data["BrickManager"])
                     self.data.pop("BrickManager")
@@ -91,6 +89,6 @@ class GameConnection(threading.Thread):
     def close(self):
         global connections
         self.client_socket.close()
-        self.data = f'"closed"'
+        self.data = "closed"
         time.sleep(DISCONNECT_TIMEOUT)
         connections.ids[self.id] = False

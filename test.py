@@ -48,6 +48,7 @@ if __name__ == "__main__":
                 running = False
             if event.type == pg.KEYDOWN:
                 h.remove()
+                print(h.groups())
         delta = clock.tick(fps) / 1000
         display.fill((255, 255, 255))
         print(h.rect.x)

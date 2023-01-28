@@ -87,14 +87,14 @@ class GameTCPClient(threading.Thread):
                 break
             if not self.getPackage() and self.data:
                 data = self.formJSON(self.data)
-                logger.debug(f"Send: {data}")
+                # logger.debug(f"Send: {data}")
                 self.send(data.encode())
-                package = self.recv(PACKAGE_SIZE)
-                logger.debug(f"Received: {package}")
+                package = self.recv(PACKAGE_SIZE).decode()
+                # logger.debug(f"Received: {package}")
                 self.packageReceived(package)
 
     def processPackage(self, pack):
-        pack = json.loads(pack.decode()) 
+        pack = json.loads(pack) 
         for _ in pack.keys():
             if pack[_] == None:
                 continue
